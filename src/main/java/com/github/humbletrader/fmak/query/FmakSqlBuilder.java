@@ -23,7 +23,7 @@ public class FmakSqlBuilder {
      * @param column    the column for which we check the distinct values
      * @return  the sql statement to be executed in order to get the distinct values from db
      */
-    ParameterizedStatement buildDistinctValuesSql(Map<String, SearchValAndOp> criteria, String column){
+    public ParameterizedStatement buildDistinctValuesSql(Map<String, SearchValAndOp> criteria, String column){
 
         StringBuilder selectString = new StringBuilder("select distinct");
 
@@ -52,7 +52,7 @@ public class FmakSqlBuilder {
      * @param page  the new page requested
      * @return  the sql to be executed against the db
      */
-    ParameterizedStatement buildSearchSql(Map<String, SearchValAndOp> criteria, int page) {
+    public ParameterizedStatement buildSearchSql(Map<String, SearchValAndOp> criteria, int page) {
         //"brand_name_version", "link", "price", "size"
         StringBuilder select = new StringBuilder("select");
         select.append(" p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public");
