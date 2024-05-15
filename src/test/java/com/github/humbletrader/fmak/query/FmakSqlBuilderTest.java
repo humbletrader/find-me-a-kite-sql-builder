@@ -88,11 +88,35 @@ class FmakSqlBuilderTest {
                         "from products p " +
                         "inner join shops s on s.id = p.shop_id "+
                         "inner join product_attributes a on p.id = a.product_id " +
-                        "where p.category=? " +
-                        "and s.country=? "+
+                        "where p.category = ? " +
+                        "and s.country = ? "+
                         "order by a.price limit ? offset ?",
                 result.getSqlWithoutParameters()
         );
         assertEquals(Arrays.asList("KITES", "UK", 21, 40), result.getParamValues());
     }
+
+    @Test
+    public void searchSqlWithIntegerParameters(){
+        Map<String, SearchValAndOp> filters = new HashMap<>();
+        filters.put("category", new SearchValAndOp("KITES", "eq"));
+        filters.put("country", new SearchValAndOp("USA", "eq"));
+        filters.put("size", new SearchValAndOp("17.0", "eq"));
+        filters.put("year", new SearchValAndOp("2022", "eq"));
+
+        ParameterizedStatement result = underTest.buildSearchSql(filters, 1);
+        assertEquals("select p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public "+
+                        "from products p " +
+                        "inner join shops s on s.id = p.shop_id "+
+                        "inner join product_attributes a on p.id = a.product_id " +
+                        "where p.category = ? " +
+                        "and s.country = ? "+
+                        "and a.size = ? "+
+                        "and p.year = ? "+
+                        "order by a.price limit ? offset ?",
+                result.getSqlWithoutParameters()
+        );
+        assertEquals(Arrays.asList("KITES", "USA", "17.0", 2022, 21, 20), result.getParamValues());
+    }
+
 }

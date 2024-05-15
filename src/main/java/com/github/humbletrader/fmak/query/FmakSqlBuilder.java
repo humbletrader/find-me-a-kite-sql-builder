@@ -87,11 +87,11 @@ public class FmakSqlBuilder {
         //first we build sql for the mandatory params ( category, country )
         SearchValAndOp categoryValueAndOp = criteria.get("category");
         result.append(" p.category")
-                .append(buildSqlOperatorFor(categoryValueAndOp), categoryValueAndOp.values());
+                .append(buildSqlOperatorFor(categoryValueAndOp), categoryValueAndOp.value());
 
         SearchValAndOp countryValueAndOp = criteria.get("country");
         result.append(" and s.country")
-                .append(buildSqlOperatorFor(countryValueAndOp), countryValueAndOp.values());
+                .append(buildSqlOperatorFor(countryValueAndOp), countryValueAndOp.value());
 
         //then we check the rest
         for (Map.Entry<String, SearchValAndOp> currentCriteria : criteria.entrySet()) {
@@ -99,13 +99,10 @@ public class FmakSqlBuilder {
             SearchValAndOp currentValAndOp = currentCriteria.getValue();
             if(!currentKey.equals("category") && !currentKey.equals("country")){
                 result.append(" and").append(prefixedColumn(currentKey))
-                        .append(buildSqlOperatorFor(currentValAndOp), currentValAndOp.values());
-//                if(currentKey.equals("year")){
-//                    //year is an integer in DB it needs special tretment
-//                    valuesForParameters.add(Integer.valueOf(currentValAndOp.value()));
-//                }else{
-//                    valuesForParameters.add(currentValAndOp.value());
-//                }
+                        .append(
+                                buildSqlOperatorFor(currentValAndOp),
+                                currentKey.equals("year") ? Integer.valueOf(currentValAndOp.value()) : currentValAndOp.value()
+                        );
             }
         }
         return result.build();
