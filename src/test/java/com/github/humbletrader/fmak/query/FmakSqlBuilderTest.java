@@ -24,9 +24,9 @@ class FmakSqlBuilderTest {
                 "select distinct p.product_name "+
                         "from products p "+
                         "inner join shops s on s.id = p.shop_id "+
-                        "where p.category=? "+
-                        "and s.country=? "+
-                        "and p.product_name=? "+
+                        "where p.category = ? "+
+                        "and s.country = ? "+
+                        "and p.product_name = ? "+
                         "order by product_name",
                 result.getSqlWithoutParameters()
         );
@@ -47,10 +47,10 @@ class FmakSqlBuilderTest {
                         "from products p "+
                         "inner join shops s on s.id = p.shop_id "+
                         "inner join product_attributes a on p.id = a.product_id " +
-                        "where p.category=? "+
-                        "and s.country=? " +
-                        "and a.size=? "+
-                        "and p.product_name=? "+
+                        "where p.category = ? "+
+                        "and s.country = ? " +
+                        "and a.size = ? "+
+                        "and p.product_name = ? "+
                         "order by product_name",
                 result.getSqlWithoutParameters()
         );
@@ -68,8 +68,8 @@ class FmakSqlBuilderTest {
                 "select distinct a.size from products p " +
                         "inner join shops s on s.id = p.shop_id " +
                         "inner join product_attributes a on p.id = a.product_id " +
-                        "where p.category=? "+
-                        "and s.country=? " +
+                        "where p.category = ? "+
+                        "and s.country = ? " +
                         "and size <> 'unknown' "+
                         "order by size",
                 result.getSqlWithoutParameters()
