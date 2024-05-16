@@ -3,6 +3,11 @@ package com.github.humbletrader.fmak.query;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * this is a chunk of sql statement that may also have parameters
+ * (which are depicted in the sql string as question marks ) and their value
+ * is kept separate in a list of parameters
+ */
 public class ParamStmtBuilder {
 
     private StringBuilder sql;
