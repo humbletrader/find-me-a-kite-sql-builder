@@ -1,11 +1,9 @@
 package com.github.humbletrader.fmak.query;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.google.common.collect.Sets;
+
 import java.util.Map;
 import java.util.Set;
-
-import com.google.common.collect.Sets;
 
 public class FmakSqlBuilder {
 
@@ -13,6 +11,10 @@ public class FmakSqlBuilder {
 
     public final int rowsPerPage;
 
+    /**
+     * creates a new instance of the sql builder
+     * @param rowsPerPage rows per page configuration
+     */
     public FmakSqlBuilder(int rowsPerPage){
         this.rowsPerPage = rowsPerPage;
     }
@@ -23,26 +25,24 @@ public class FmakSqlBuilder {
      * @param column    the column for which we check the distinct values
      * @return  the sql statement to be executed in order to get the distinct values from db
      */
-    public ParameterizedStatement buildDistinctValuesSql(Map<String, SearchValAndOp> criteria, String column){
-
-        StringBuilder selectString = new StringBuilder("select distinct");
+    public ParameterizedStatement buildDistinctValuesSql(Map<String, SearchValAndOp> criteria,
+                                                         String column){
+        ParamStmtBuilder selectStatement = new ParamStmtBuilder()
+                .append("select distinct")
+                .append(prefixedColumn(column))
+                .append(" from products p")
+                .append(" inner join shops s on s.id = p.shop_id");
 
         boolean isColumnFromProductAttributes = isProductAttributeTableColumn(column);
-        selectString.append(prefixedColumn(column));
-
-
-        StringBuilder fromString = new StringBuilder(" from products p");
-        fromString.append(" inner join shops s on s.id = p.shop_id");
         if(isColumnFromProductAttributes || !Sets.intersection(criteria.keySet(), PRODUCT_ATTRIBUTES_COLUMNS).isEmpty()){
-            fromString.append(" inner join product_attributes a on p.id = a.product_id");
+            selectStatement.append(" inner join product_attributes a on p.id = a.product_id");
         }
-        selectString.append(fromString);
 
-        ParameterizedStatement whereParameterizedStatement = whereFromCriteria(criteria);
-        selectString.append(whereParameterizedStatement.getSqlWithoutParameters());
-        selectString.append(avoidForbiddenValues(column));
-        selectString.append(" order by ").append(column);
-        return new ParameterizedStatement(selectString.toString(), whereParameterizedStatement.getParamValues());
+        selectStatement
+                .append(whereFromCriteria(criteria))
+                .append(avoidForbiddenValues(column))
+                .append(" order by ").append(column);
+        return selectStatement.build();
     }
 
 
@@ -54,22 +54,16 @@ public class FmakSqlBuilder {
      */
     public ParameterizedStatement buildSearchSql(Map<String, SearchValAndOp> criteria, int page) {
         //"brand_name_version", "link", "price", "size"
-        StringBuilder select = new StringBuilder("select");
-        select.append(" p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public");
-        select.append(" from products p");
-        select.append(" inner join shops s on s.id = p.shop_id");
-        select.append(" inner join product_attributes a on p.id = a.product_id");
-
-        ParameterizedStatement whereStatement = whereFromCriteria(criteria);
-        select.append(whereStatement.getSqlWithoutParameters());
-        List<Object> valuesForParameters = whereStatement.getParamValues();
-
-        int startOfPage = page * rowsPerPage;
-        select.append(" order by a.price limit ? offset ?");
-        valuesForParameters.add(rowsPerPage + 1); //request one more row to detect if there is a next page available
-        valuesForParameters.add(startOfPage);
-
-        return new ParameterizedStatement(select.toString(), valuesForParameters);
+        ParamStmtBuilder select = new ParamStmtBuilder()
+                .append("select")
+                .append(" p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public")
+                .append(" from products p")
+                .append(" inner join shops s on s.id = p.shop_id")
+                .append(" inner join product_attributes a on p.id = a.product_id")
+                .append(whereFromCriteria(criteria))
+                .append(" order by a.price limit ?", rowsPerPage+1) //request one more row to detect if there is a next page available
+                .append(" offset ?",page * rowsPerPage );
+        return select.build();
     }
 
     /**
@@ -77,41 +71,50 @@ public class FmakSqlBuilder {
      * @param criteria  the criteria
      * @return  a part of sql with the "where" clause
      */
-    ParameterizedStatement whereFromCriteria(Map<String, SearchValAndOp> criteria){
-        StringBuilder whereString = new StringBuilder(" where");
-        List<Object> valuesForParameters = new ArrayList<>();
+    ParamStmtBuilder whereFromCriteria(Map<String, SearchValAndOp> criteria){
+        ParamStmtBuilder result = new ParamStmtBuilder();
+        result.append(" where");
 
         //first we build sql for the mandatory params ( category, country )
         SearchValAndOp categoryValueAndOp = criteria.get("category");
-        whereString.append(" p.category").append(buildSqlOperatorFor(categoryValueAndOp)).append("?");
-        valuesForParameters.add(categoryValueAndOp.value());
+        result.append(" p.category")
+                .append(buildSqlOperatorFor(categoryValueAndOp));
 
         SearchValAndOp countryValueAndOp = criteria.get("country");
-        whereString.append(" and s.country").append(buildSqlOperatorFor(countryValueAndOp)).append("?");
-        valuesForParameters.add(countryValueAndOp.value());
+        result.append(" and s.country")
+                .append(buildSqlOperatorFor(countryValueAndOp));
 
         //then we check the rest
         for (Map.Entry<String, SearchValAndOp> currentCriteria : criteria.entrySet()) {
             String currentKey = currentCriteria.getKey();
             SearchValAndOp currentValAndOp = currentCriteria.getValue();
             if(!currentKey.equals("category") && !currentKey.equals("country")){
-                whereString.append(" and").append(prefixedColumn(currentKey)).append(buildSqlOperatorFor(currentValAndOp)).append("?");
-                if(currentKey.equals("year")){
-                    //year is an integer in DB it needs special tretment
-                    valuesForParameters.add(Integer.valueOf(currentValAndOp.value()));
-                }else{
-                    valuesForParameters.add(currentValAndOp.value());
-                }
+                result.append(" and").append(prefixedColumn(currentKey))
+                        .append(buildSqlOperatorFor(currentValAndOp, currentKey.equals("year")));
             }
         }
-
-        return new ParameterizedStatement(whereString.toString(), valuesForParameters);
+        return result;
     }
 
 
-    private String buildSqlOperatorFor(SearchValAndOp searchValAndOp){
-        if(searchValAndOp.op().equals("eq")) return "=";
-        else throw new IllegalArgumentException("unsupported operator");
+    private ParamStmtBuilder buildSqlOperatorFor(SearchValAndOp searchValAndOp){
+        ParamStmtBuilder result = new ParamStmtBuilder();
+        var sqlOp = SqlOperators.forJs(searchValAndOp.op());
+        return switch(sqlOp){
+            case ANY -> result.append(" in ( ? )", searchValAndOp.value());
+            default -> result.append(" " + sqlOp.getSqlOperator() + " ?", searchValAndOp.value());
+        };
+    }
+
+    @Deprecated
+    private ParamStmtBuilder buildSqlOperatorFor(SearchValAndOp searchValAndOp, boolean castToInteger){
+        ParamStmtBuilder result = new ParamStmtBuilder();
+        Object sqlValue = castToInteger ? Integer.valueOf(searchValAndOp.value()) : searchValAndOp.value();
+        var sqlOp = SqlOperators.forJs(searchValAndOp.op());
+        return switch(sqlOp){
+            case ANY -> result.append(" in ( ? )", sqlValue);
+            default -> result.append(" " + sqlOp.getSqlOperator() + " ?", sqlValue);
+        };
     }
 
     private String prefixedColumn(String column){
@@ -121,6 +124,7 @@ public class FmakSqlBuilder {
             return " p."+column;
         }
     }
+
     private boolean isProductAttributeTableColumn(String colName){
         return PRODUCT_ATTRIBUTES_COLUMNS.contains(colName);
     }
@@ -129,10 +133,10 @@ public class FmakSqlBuilder {
     String avoidForbiddenValues(String column){
         return
                 switch(column){
-                    case "brand" -> " and brand <> 'unknown'";
-                    case "year" -> " and year <> -1 and year <> -2";
-                    case "version" -> " and version <> 'not needed' and version <> 'unknown'";
-                    case "size" -> " and size <> 'unknown'";
+                    case "brand" -> " and brand <> 'unknown'"; //no longer needed
+                    case "year" -> " and year <> -1 and year <> -2"; //still needed
+                    case "version" -> " and version <> 'not needed' and version <> 'unknown'"; //is this still needed ?
+                    case "size" -> " and size <> 'unknown'"; //no longer needed
                     case "product_name", "condition", "subprod_name" -> "";
                     default -> throw new RuntimeException("impossible to avoid forbidden values for column " + column);
                 };
