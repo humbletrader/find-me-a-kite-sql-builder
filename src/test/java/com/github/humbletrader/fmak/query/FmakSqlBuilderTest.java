@@ -120,7 +120,7 @@ class FmakSqlBuilderTest {
         assertEquals(Arrays.asList("KITES", "USA", "17.0", 2022, 21, 20), result.getParamValues());
     }
 
-    @Disabled(value = "price is not translated correctly")
+    @Test
     public void searchSqlWithGreaterThanOperator(){
         Map<String, SearchValAndOp> filters = new HashMap<>();
         filters.put("category", new SearchValAndOp("KITES", "eq"));

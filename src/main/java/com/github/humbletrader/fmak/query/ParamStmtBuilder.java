@@ -1,7 +1,9 @@
 package com.github.humbletrader.fmak.query;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * this is a chunk of sql statement that may also have parameters
@@ -23,15 +25,30 @@ public class ParamStmtBuilder {
         return this;
     }
 
-    public ParamStmtBuilder append(String sqlPart, List<Object> params){
+    public ParamStmtBuilder append(String sqlPart,
+                                   String stringParam){
         sql.append(sqlPart);
-        values.addAll(params);
+        values.add(stringParam);
         return this;
     }
 
-    public ParamStmtBuilder append(String sqlPart, Object param){
+    public ParamStmtBuilder append(String sqlPart,
+                                   Integer intParam){
         sql.append(sqlPart);
-        values.add(param);
+        values.add(intParam);
+        return this;
+    }
+
+    public ParamStmtBuilder append(String sqlPart,
+                                   String paramStrValue,
+                                   SqlType sqlType){
+        sql.append(sqlPart);
+        Object castedValue = switch (sqlType){
+            case VARCHAR_TYPE -> paramStrValue;
+            case INT_TYPE -> Integer.valueOf(paramStrValue);
+            case DOUBLE_TYPE -> Double.valueOf(paramStrValue);
+        };
+        values.add(castedValue);
         return this;
     }
 
