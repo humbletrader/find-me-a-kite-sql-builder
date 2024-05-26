@@ -4,6 +4,9 @@ public enum SqlOperators {
     EQ("eq", "="),
     NE("ne", "!="),
     GT("gt", ">"),
+    GTE("gte", ">="),
+    LT("lt", "<"),
+    LTE("lte", "<="),
     ANY("any", "in");
 
     private final String jsOperator;
