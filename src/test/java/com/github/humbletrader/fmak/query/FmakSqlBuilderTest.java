@@ -143,4 +143,25 @@ class FmakSqlBuilderTest {
         assertEquals(Arrays.asList("KITES", "USA", "17.0", 1000.0, 21, 20), result.getParamValues());
     }
 
+    @Test
+    public void searchSqlWithAnyOperator(){
+        Map<String, SearchValAndOp> filters = new HashMap<>();
+        filters.put("category", new SearchValAndOp("KITES", "eq"));
+        filters.put("country", new SearchValAndOp("USA", "eq"));
+        filters.put("price", new SearchValAndOp(List.of("1000", "2000"), "anyOf"));
+
+        ParameterizedStatement result = underTest.buildSearchSql(filters, 1);
+        assertEquals("select p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public "+
+                        "from products p " +
+                        "inner join shops s on s.id = p.shop_id "+
+                        "inner join product_attributes a on p.id = a.product_id " +
+                        "where p.category = ? " +
+                        "and s.country = ? "+
+                        "and ( a.price = ? or a.price = ?) "+
+                        "order by a.price limit ? offset ?",
+                result.getSqlWithoutParameters()
+        );
+        assertEquals(Arrays.asList("KITES", "USA", "17.0", 1000.0, 21, 20), result.getParamValues());
+    }
+
 }

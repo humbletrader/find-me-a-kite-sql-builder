@@ -6,8 +6,7 @@ public enum SqlOperators {
     GT("gt", ">"),
     GTE("gte", ">="),
     LT("lt", "<"),
-    LTE("lte", "<="),
-    ANY("any", "in");
+    LTE("lte", "<=");
 
     private final String jsOperator;
     private final String sqlOperator;
