@@ -12,7 +12,7 @@
 
     <groupId>com.github.humbletrader</groupId>
     <artifactId>findmeakite-sql-builder</artifactId>
-    <version>1.2.0-filter-by-price-SNAPSHOT</version>
+    <version>1.3.0-support-for-any-SNAPSHOT</version>
     <name>find-me-a-kite-sql-builder</name>
     <description>Sql Query Builder for find-me-a-kite</description>
 
