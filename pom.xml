@@ -12,7 +12,7 @@
 
     <groupId>com.github.humbletrader</groupId>
     <artifactId>findmeakite-sql-builder</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
     <name>find-me-a-kite-sql-builder</name>
     <description>Sql Query Builder for find-me-a-kite</description>
 

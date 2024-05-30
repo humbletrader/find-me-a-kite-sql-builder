@@ -126,7 +126,7 @@ public class FmakSqlBuilder {
                     case "year" -> " and year <> -1 and year <> -2"; //still needed
                     case "version" -> " and version <> 'not needed' and version <> 'unknown'"; //is this still needed ?
                     case "size" -> " and size <> 'unknown'"; //no longer needed
-                    case "product_name", "condition", "subprod_name" -> "";
+                    case "product_name", "condition", "subprod_name", "price" -> "";
                     default -> throw new RuntimeException("impossible to avoid forbidden values for column " + column);
                 };
     }
