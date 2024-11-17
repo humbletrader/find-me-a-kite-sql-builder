@@ -1,8 +1,7 @@
 package com.github.humbletrader.fmak.query;
 
-import com.google.common.collect.Sets;
-
 import java.util.Map;
+import java.util.Set;
 
 import static com.github.humbletrader.fmak.query.Tables.*;
 import static com.google.common.collect.Sets.intersection;
@@ -29,7 +28,7 @@ public class FmakSqlBuilder {
      * @param column    the column for which we check the distinct values
      * @return  the sql statement to be executed in order to get the distinct values from db
      */
-    public ParameterizedStatement buildDistinctValuesSql(Map<String, SearchValAndOp> criteria,
+    public ParameterizedStatement buildDistinctValuesSql(Map<String, Set<SearchValAndOp>> criteria,
                                                          String column){
         ParamStmtBuilder selectStatement = new ParamStmtBuilder()
                 .append("select distinct")
@@ -56,7 +55,7 @@ public class FmakSqlBuilder {
      * @param page  the new page requested
      * @return  the sql to be executed against the db
      */
-    public ParameterizedStatement buildSearchSql(Map<String, SearchValAndOp> criteria, int page) {
+    public ParameterizedStatement buildSearchSql(Map<String, Set<SearchValAndOp>> criteria, int page) {
         //"brand_name_version", "link", "price", "size"
         ParamStmtBuilder select = new ParamStmtBuilder()
                 .append("select")
@@ -75,28 +74,34 @@ public class FmakSqlBuilder {
      * @param criteria  the criteria
      * @return  a part of sql with the "where" clause
      */
-    ParamStmtBuilder whereFromCriteria(Map<String, SearchValAndOp> criteria){
+    ParamStmtBuilder whereFromCriteria(Map<String, Set<SearchValAndOp>> criteria){
         ParamStmtBuilder result = new ParamStmtBuilder();
         result.append(" where");
 
         //first we build sql for the mandatory params ( category, country )
-        SearchValAndOp categoryValueAndOp = criteria.get("category");
-        result.append(" p.category")
-                .append(buildSqlOperatorFor(findColumn("category"), categoryValueAndOp));
+        Set<SearchValAndOp> categoryValuesAndOps = criteria.get("category");
+        result.append(" p.category");
+        categoryValuesAndOps.forEach(categoryValAndOp ->
+                result.append(buildSqlOperatorFor(findColumn("category"), categoryValAndOp))
+        );
 
-        SearchValAndOp countryValueAndOp = criteria.get("country");
-        result.append(" and s.country")
-                .append(buildSqlOperatorFor(findColumn("country"), countryValueAndOp));
+        Set<SearchValAndOp> countryValuesAndOps = criteria.get("country");
+        result.append(" and s.country");
+        countryValuesAndOps.forEach(countryValAndOp ->
+                result.append(buildSqlOperatorFor(findColumn("country"), countryValAndOp))
+        );
 
         //then we check the rest
-        for (Map.Entry<String, SearchValAndOp> currentCriteria : criteria.entrySet()) {
+        for (Map.Entry<String, Set<SearchValAndOp>> currentCriteria : criteria.entrySet()) {
             String currentKey = currentCriteria.getKey();
-            SearchValAndOp currentValAndOp = currentCriteria.getValue();
-            if(!currentKey.equals("category") && !currentKey.equals("country")){
-                Column column = findColumn(currentKey);
-                result.append(" and").append(prefixedColumn(currentKey))
-                        .append(buildSqlOperatorFor(column, currentValAndOp));
-            }
+            Set<SearchValAndOp> currentValuesAndOps = currentCriteria.getValue();
+            currentValuesAndOps.forEach(currentValAndOp -> {
+                if (!currentKey.equals("category") && !currentKey.equals("country")) {
+                    Column column = findColumn(currentKey);
+                    result.append(" and").append(prefixedColumn(currentKey))
+                            .append(buildSqlOperatorFor(column, currentValAndOp));
+                }
+            });
         }
         return result;
     }
