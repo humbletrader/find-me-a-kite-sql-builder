@@ -12,10 +12,10 @@ class FmakSqlBuilderTest {
 
     @Test
     public void sqlBuildForTwoParametersNonProductAttributes(){
-        Map<String, Set<SearchValAndOp>> filters = new HashMap<>();
-        filters.put("category", Set.of(new SearchValAndOp("KITES", "eq")));
-        filters.put("country", Set.of(new SearchValAndOp("EU", "eq")));
-        filters.put("product_name", Set.of(new SearchValAndOp("cabrinha", "eq")));
+        Map<String, SequencedSet<SearchValAndOp>> filters = new HashMap<>();
+        filters.put("category", new LinkedHashSet<>(List.of(new SearchValAndOp("KITES", "eq"))));
+        filters.put("country", new LinkedHashSet<>(List.of(new SearchValAndOp("EU", "eq"))));
+        filters.put("product_name", new LinkedHashSet<>(List.of(new SearchValAndOp("cabrinha", "eq"))));
 
         ParameterizedStatement result = underTest.buildDistinctValuesSql(filters,   "product_name");
         assertEquals(
@@ -33,11 +33,11 @@ class FmakSqlBuilderTest {
 
     @Test
     public void sqlShouldContainAJoinWhenSizeIsInFilter(){
-        Map<String, Set<SearchValAndOp>> filters = new HashMap<>();
-        filters.put("category", Set.of(new SearchValAndOp("KITES", "eq")));
-        filters.put("country", Set.of(new SearchValAndOp("EU", "eq")));
-        filters.put("product_name", Set.of(new SearchValAndOp("cabrinha", "eq")));
-        filters.put("size", Set.of(new SearchValAndOp("10", "eq")));
+        Map<String, SequencedSet<SearchValAndOp>> filters = new HashMap<>();
+        filters.put("category", new LinkedHashSet<>(List.of(new SearchValAndOp("KITES", "eq"))));
+        filters.put("country", new LinkedHashSet<>(List.of(new SearchValAndOp("EU", "eq"))));
+        filters.put("product_name", new LinkedHashSet<>(List.of(new SearchValAndOp("cabrinha", "eq"))));
+        filters.put("size", new LinkedHashSet<>(List.of(new SearchValAndOp("10", "eq"))));
 
         ParameterizedStatement result = underTest.buildDistinctValuesSql(filters, "product_name");
         assertEquals(
@@ -57,9 +57,9 @@ class FmakSqlBuilderTest {
 
     @Test
     public void distinctSize(){
-        Map<String, Set<SearchValAndOp>> filters = new HashMap<>();
-        filters.put("category", Set.of(new SearchValAndOp("KITES", "eq")));
-        filters.put("country", Set.of(new SearchValAndOp("US", "eq")));
+        Map<String, SequencedSet<SearchValAndOp>> filters = new HashMap<>();
+        filters.put("category", new LinkedHashSet<>(List.of(new SearchValAndOp("KITES", "eq"))));
+        filters.put("country", new LinkedHashSet<>(List.of(new SearchValAndOp("US", "eq"))));
 
         ParameterizedStatement result = underTest.buildDistinctValuesSql(filters, "size");
         assertEquals(
@@ -77,9 +77,9 @@ class FmakSqlBuilderTest {
 
     @Test
     public void searchSql(){
-        Map<String, Set<SearchValAndOp>> filters = new HashMap<>();
-        filters.put("category", Set.of(new SearchValAndOp("KITES", "eq")));
-        filters.put("country", Set.of(new SearchValAndOp("UK", "eq")));
+        Map<String, SequencedSet<SearchValAndOp>> filters = new HashMap<>();
+        filters.put("category", new LinkedHashSet<>(List.of(new SearchValAndOp("KITES", "eq"))));
+        filters.put("country", new LinkedHashSet<>(List.of(new SearchValAndOp("UK", "eq"))));
 
         ParameterizedStatement result = underTest.buildSearchSql(filters, 2);
         assertEquals("select p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public "+
@@ -96,11 +96,11 @@ class FmakSqlBuilderTest {
 
     @Test
     public void searchSqlWithIntegerParameters(){
-        Map<String, Set<SearchValAndOp>> filters = new HashMap<>();
-        filters.put("category", Set.of(new SearchValAndOp("KITES", "eq")));
-        filters.put("country", Set.of(new SearchValAndOp("USA", "eq")));
-        filters.put("size", Set.of(new SearchValAndOp("17.0", "eq")));
-        filters.put("year", Set.of(new SearchValAndOp("2022", "eq")));
+        Map<String, SequencedSet<SearchValAndOp>> filters = new HashMap<>();
+        filters.put("category", new LinkedHashSet<>(List.of(new SearchValAndOp("KITES", "eq"))));
+        filters.put("country", new LinkedHashSet<>(List.of(new SearchValAndOp("USA", "eq"))));
+        filters.put("size", new LinkedHashSet<>(List.of(new SearchValAndOp("15.0", "gt"), new SearchValAndOp("17.0", "lt"))));
+        filters.put("year", new LinkedHashSet<>(List.of(new SearchValAndOp("2022", "eq"))));
 
         ParameterizedStatement result = underTest.buildSearchSql(filters, 1);
         assertEquals("select p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public "+
@@ -109,21 +109,22 @@ class FmakSqlBuilderTest {
                         "inner join product_attributes a on p.id = a.product_id " +
                         "where p.category = ? " +
                         "and s.country = ? "+
-                        "and a.size = ? "+
+                        "and a.size > ? "+
+                        "and a.size < ? "+
                         "and p.year = ? "+
                         "order by a.price limit ? offset ?",
                 result.getSqlWithoutParameters()
         );
-        assertEquals(Arrays.asList("KITES", "USA", "17.0", 2022, 21, 20), result.getParamValues());
+        assertEquals(Arrays.asList("KITES", "USA", "15.0", "17.0", 2022, 21, 20), result.getParamValues());
     }
 
     @Test
     public void searchSqlWithGreaterThanOperator(){
-        Map<String, Set<SearchValAndOp>> filters = new HashMap<>();
-        filters.put("category", Set.of(new SearchValAndOp("KITES", "eq")));
-        filters.put("country", Set.of(new SearchValAndOp("USA", "eq")));
-        filters.put("size", Set.of(new SearchValAndOp("17.0", "eq")));
-        filters.put("price", Set.of(new SearchValAndOp("1000", "gt")));
+        Map<String, SequencedSet<SearchValAndOp>> filters = new HashMap<>();
+        filters.put("category", new LinkedHashSet<>(List.of(new SearchValAndOp("KITES", "eq"))));
+        filters.put("country", new LinkedHashSet<>(List.of(new SearchValAndOp("USA", "eq"))));
+        filters.put("size", new LinkedHashSet<>(List.of(new SearchValAndOp("17.0", "eq"))));
+        filters.put("price", new LinkedHashSet<>(List.of(new SearchValAndOp("1000", "gt"))));
 
         ParameterizedStatement result = underTest.buildSearchSql(filters, 1);
         assertEquals("select p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public "+

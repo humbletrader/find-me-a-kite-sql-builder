@@ -1,6 +1,7 @@
 package com.github.humbletrader.fmak.query;
 
 import java.util.Map;
+import java.util.SequencedSet;
 import java.util.Set;
 
 import static com.github.humbletrader.fmak.query.Tables.*;
@@ -28,7 +29,7 @@ public class FmakSqlBuilder {
      * @param column    the column for which we check the distinct values
      * @return  the sql statement to be executed in order to get the distinct values from db
      */
-    public ParameterizedStatement buildDistinctValuesSql(Map<String, Set<SearchValAndOp>> criteria,
+    public ParameterizedStatement buildDistinctValuesSql(Map<String, SequencedSet<SearchValAndOp>> criteria,
                                                          String column){
         ParamStmtBuilder selectStatement = new ParamStmtBuilder()
                 .append("select distinct")
@@ -55,7 +56,7 @@ public class FmakSqlBuilder {
      * @param page  the new page requested
      * @return  the sql to be executed against the db
      */
-    public ParameterizedStatement buildSearchSql(Map<String, Set<SearchValAndOp>> criteria, int page) {
+    public ParameterizedStatement buildSearchSql(Map<String, SequencedSet<SearchValAndOp>> criteria, int page) {
         //"brand_name_version", "link", "price", "size"
         ParamStmtBuilder select = new ParamStmtBuilder()
                 .append("select")
@@ -74,7 +75,7 @@ public class FmakSqlBuilder {
      * @param criteria  the criteria
      * @return  a part of sql with the "where" clause
      */
-    ParamStmtBuilder whereFromCriteria(Map<String, Set<SearchValAndOp>> criteria){
+    ParamStmtBuilder whereFromCriteria(Map<String, SequencedSet<SearchValAndOp>> criteria){
         ParamStmtBuilder result = new ParamStmtBuilder();
         result.append(" where");
 
@@ -92,7 +93,7 @@ public class FmakSqlBuilder {
         );
 
         //then we check the rest
-        for (Map.Entry<String, Set<SearchValAndOp>> currentCriteria : criteria.entrySet()) {
+        for (Map.Entry<String, SequencedSet<SearchValAndOp>> currentCriteria : criteria.entrySet()) {
             String currentKey = currentCriteria.getKey();
             Set<SearchValAndOp> currentValuesAndOps = currentCriteria.getValue();
             currentValuesAndOps.forEach(currentValAndOp -> {
