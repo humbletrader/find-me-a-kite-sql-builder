@@ -51,6 +51,11 @@ public enum Tables {
         return publicColumns.containsKey(columnName);
     }
 
+    /**
+     * may return null if the column cannot be found
+     * @param columnName
+     * @return
+     */
     public Column getColumn(String columnName){
         return publicColumns.get(columnName);
     }
