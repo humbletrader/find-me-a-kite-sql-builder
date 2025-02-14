@@ -4,11 +4,11 @@ import com.github.humbletrader.fmak.criteria.FilterOpVal;
 import com.github.humbletrader.fmak.criteria.SupportedFilter;
 import com.github.humbletrader.fmak.tables.ProductAttributesTable;
 import com.github.humbletrader.fmak.tables.ProductTable;
+import com.google.common.collect.Streams;
 
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.SequencedSet;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 
@@ -25,18 +25,6 @@ public class FmakSqlBuilder {
      */
     public FmakSqlBuilder(int rowsPerPage){
         this.rowsPerPage = rowsPerPage;
-    }
-
-    private SequencedSet<FilterOpVal> webFiltersToInternalFilters(Map<String, SequencedSet<SearchValAndOp>> webFilters){
-        return webFilters.entrySet()
-                .stream()
-                .map(entry ->
-                    new FilterOpVal(
-                            SupportedFilter.filterFromName(entry.getKey()),
-                            entry.getValue()
-                    )
-                )
-                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     public ParameterizedStatement buildDistinctValuesSql(Map<String, SequencedSet<SearchValAndOp>> criteria,
@@ -102,50 +90,38 @@ public class FmakSqlBuilder {
      * @param criteria  the criteria
      * @return  a part of sql with the "where" clause
      */
-    ParamStmtBuilder whereFromCriteria(SequencedSet<FilterOpVal> criteria){
+    private ParamStmtBuilder whereFromCriteria(SequencedSet<FilterOpVal> criteria){
         ParamStmtBuilder result = new ParamStmtBuilder();
         result.append(" where");
 
-        //first we build sql for the mandatory params ( category, country )
-        Set<SearchValAndOp> categoryValuesAndOps = criteria.stream()
-                .filter(filterOpVal -> filterOpVal.filter().equals(SupportedFilter.category))
-                .findFirst()
-                .map(FilterOpVal::values)
-                .orElseThrow(() -> new RuntimeException("category is mandatory"));
-        result.append(" ").append(SupportedFilter.category.getColumn().prefixedColumnName());
-        categoryValuesAndOps.forEach(categoryValAndOp ->
-                result.append(buildSqlOperatorFor(SupportedFilter.category.getColumn(), categoryValAndOp))
-        );
+        Streams.mapWithIndex(
+                criteria.stream(),
+                (crit, idx) -> buildWhereCondition(crit, idx == 0 ? " " : " and ")
+        )
+        .forEachOrdered(result::append);
 
-        Set<SearchValAndOp> countryValuesAndOps = criteria.stream()
-                .filter(filterOpVal -> filterOpVal.filter().equals(SupportedFilter.country))
-                .findFirst()
-                .map(FilterOpVal::values)
-                .orElseThrow(() -> new RuntimeException("country is mandatory"));
-        result.append(" and ").append(SupportedFilter.country.getColumn().prefixedColumnName());
-        countryValuesAndOps.forEach(countryValAndOp ->
-                result.append(buildSqlOperatorFor(SupportedFilter.country.getColumn(), countryValAndOp))
-        );
-
-        //then we check the rest
-        criteria.forEach(currentCriteria -> {
-            SupportedFilter currentKey = currentCriteria.filter();
-            Set<SearchValAndOp> currentValuesAndOps = currentCriteria.values();
-            currentValuesAndOps.forEach(currentValAndOp -> {
-                //avoid the two filters already processed
-                if (!currentKey.equals(SupportedFilter.category) && !currentKey.equals(SupportedFilter.country)) {
-                    FmakColumn column = currentKey.getColumn();
-                    result.append(" and ")
-                            .append(column.prefixedColumnName())
-                            .append(buildSqlOperatorFor(column, currentValAndOp));
-                }
-            });
-        });
         return result;
     }
 
-    private ParamStmtBuilder buildSqlOperatorFor(FmakColumn column, SearchValAndOp searchValAndOp){
+    private ParamStmtBuilder buildWhereCondition(FilterOpVal filterOpVal,
+                                                 String before){
         ParamStmtBuilder result = new ParamStmtBuilder();
+        result.append(before);
+
+        FmakColumn column = filterOpVal.filter().getColumn();
+
+        Streams.mapWithIndex(
+                    filterOpVal.values().stream(),
+                    (searchValAndOp, idx) -> buildWhereSingleCondition(column, searchValAndOp, idx == 0 ? "" : " and ")
+                )
+                .forEachOrdered(result::append);
+        return result;
+    }
+
+    private ParamStmtBuilder buildWhereSingleCondition(FmakColumn column, SearchValAndOp searchValAndOp, String before){
+        ParamStmtBuilder result = new ParamStmtBuilder();
+        result.append(before);
+        result.append(column.prefixedColumnName());
         var sqlOp = SqlOperators.forJs(searchValAndOp.op());
         return switch(sqlOp){
             case ANY -> result.append(" in ( ? )", searchValAndOp.value(), column.sqlType());
@@ -154,7 +130,7 @@ public class FmakSqlBuilder {
     }
 
     @Deprecated //todo: as the parser gets better we don't need this method anymore
-    String avoidForbiddenValues(FmakColumn column){
+    private String avoidForbiddenValues(FmakColumn column){
         return
                 switch(column){
                     case ProductTable.brand -> " and brand <> 'unknown'"; //no longer needed
@@ -164,5 +140,18 @@ public class FmakSqlBuilder {
                     case ProductTable.product_name, ProductTable.condition, ProductTable.subprod_name, ProductAttributesTable.price -> "";
                     default -> throw new RuntimeException("impossible to avoid forbidden values for column " + column);
                 };
+    }
+
+    private SequencedSet<FilterOpVal> webFiltersToInternalFilters(Map<String, SequencedSet<SearchValAndOp>> webFilters){
+        return webFilters.entrySet()
+                .stream()
+                .map(entry ->
+                        new FilterOpVal(
+                                SupportedFilter.filterFromName(entry.getKey()),
+                                entry.getValue()
+                        )
+                )
+                .sorted((fov1, fov2) -> Integer.compare(fov2.filter().getPriorityInSqlWhereClause(), fov1.filter().getPriorityInSqlWhereClause()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 }

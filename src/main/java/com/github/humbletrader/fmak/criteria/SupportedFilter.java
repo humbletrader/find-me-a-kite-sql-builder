@@ -6,30 +6,36 @@ import com.github.humbletrader.fmak.tables.ProductTable;
 import com.github.humbletrader.fmak.tables.ShopTable;
 
 public enum SupportedFilter {
-    country("country", ShopTable.country),
+    country("country", ShopTable.country, 10_000),
 
-    category("category", ProductTable.category),
-    brand("brand", ProductTable.brand),
-    product_name("product_name", ProductTable.product_name),
-    subprod_name("subprod_name", ProductTable.subprod_name),
-    version("version", ProductTable.version),
-    condition("condition", ProductTable.condition),
-    year("year", ProductTable.year),
+    category("category", ProductTable.category, 20_000),
+    brand("brand", ProductTable.brand, 5_000),
+    product_name("product_name", ProductTable.product_name, 1_000),
+    subprod_name("subprod_name", ProductTable.subprod_name, 10),
+    version("version", ProductTable.version, 5),
+    condition("condition", ProductTable.condition, 3_000),
+    year("year", ProductTable.year, 2_000),
 
-    size("size", ProductAttributesTable.size),
-    price("price", ProductAttributesTable.price);
+    size("size", ProductAttributesTable.size, 500),
+    price("price", ProductAttributesTable.price, 300);
 
 
     private String nameInWebsite;
     private FmakColumn column;
+    private int priorityInSqlWhereClause;
 
-    SupportedFilter(String nameInWebsite, FmakColumn column){
+    SupportedFilter(String nameInWebsite, FmakColumn column, int priorityInSqlWhereClause){
         this.nameInWebsite = nameInWebsite;
         this.column = column;
+        this.priorityInSqlWhereClause = priorityInSqlWhereClause;
     }
 
     public FmakColumn getColumn(){
         return column;
+    }
+
+    public int getPriorityInSqlWhereClause(){
+        return priorityInSqlWhereClause;
     }
 
     public static SupportedFilter filterFromName(String filterNameInWeb){

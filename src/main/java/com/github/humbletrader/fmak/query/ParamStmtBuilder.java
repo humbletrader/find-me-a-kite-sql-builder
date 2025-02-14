@@ -1,9 +1,7 @@
 package com.github.humbletrader.fmak.query;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * this is a chunk of sql statement that may also have parameters
