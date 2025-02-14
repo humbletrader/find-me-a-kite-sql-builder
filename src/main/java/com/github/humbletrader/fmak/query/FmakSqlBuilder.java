@@ -1,17 +1,15 @@
 package com.github.humbletrader.fmak.query;
 
+import com.github.humbletrader.fmak.criteria.FilterOpVal;
 import com.github.humbletrader.fmak.criteria.SupportedFilter;
-import com.github.humbletrader.fmak.tables.ProductAttributesTableColumns;
-import com.github.humbletrader.fmak.tables.ProductTableColumns;
+import com.github.humbletrader.fmak.tables.ProductAttributesTable;
+import com.github.humbletrader.fmak.tables.ProductTable;
 
-import java.util.AbstractMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.SequencedSet;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static com.github.humbletrader.fmak.query.FmakTables.*;
-import static com.google.common.collect.Sets.intersection;
 
 
 /**
@@ -29,19 +27,16 @@ public class FmakSqlBuilder {
         this.rowsPerPage = rowsPerPage;
     }
 
-    private Map<SupportedFilter, SequencedSet<SearchValAndOp>> webFiltersToInternalFilters(Map<String, SequencedSet<SearchValAndOp>> webFilters){
+    private SequencedSet<FilterOpVal> webFiltersToInternalFilters(Map<String, SequencedSet<SearchValAndOp>> webFilters){
         return webFilters.entrySet()
                 .stream()
                 .map(entry ->
-                    new AbstractMap.SimpleEntry<>(
+                    new FilterOpVal(
                             SupportedFilter.filterFromName(entry.getKey()),
                             entry.getValue()
                     )
                 )
-                .collect(Collectors.toMap(
-                        keyValue-> keyValue.getKey(),
-                        keyValue -> keyValue.getValue()
-                ));
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     public ParameterizedStatement buildDistinctValuesSql(Map<String, SequencedSet<SearchValAndOp>> criteria,
@@ -56,7 +51,7 @@ public class FmakSqlBuilder {
      * @param distinctColumn    the column for which we check the distinct values
      * @return  the sql statement to be executed in order to get the distinct values from db
      */
-    public ParameterizedStatement buildDistinctValuesSql(Map<SupportedFilter, SequencedSet<SearchValAndOp>> criteria,
+    public ParameterizedStatement buildDistinctValuesSql(SequencedSet<FilterOpVal> criteria,
                                                          SupportedFilter distinctColumn){
         ParamStmtBuilder selectStatement = new ParamStmtBuilder()
                 .append("select distinct")
@@ -64,8 +59,8 @@ public class FmakSqlBuilder {
                 .append(" from products p")
                 .append(" inner join shops s on s.id = p.shop_id");
 
-        if(RenameMeTable.PRODUCT_ATTRIBUTES == distinctColumn.getColumn().table() ||
-                criteria.keySet().stream().anyMatch(filter -> filter.getColumn().table().equals(RenameMeTable.PRODUCT_ATTRIBUTES))){
+        if(FmakTable.PRODUCT_ATTRIBUTES == distinctColumn.getColumn().table() ||
+                criteria.stream().anyMatch(filterOperatorValues -> filterOperatorValues.filter().getColumn().table().equals(FmakTable.PRODUCT_ATTRIBUTES))){
             selectStatement.append(" inner join product_attributes a on p.id = a.product_id");
         }
 
@@ -88,7 +83,7 @@ public class FmakSqlBuilder {
      * @param page  the new page requested
      * @return  the sql to be executed against the db
      */
-    public ParameterizedStatement buildSearchSql(Map<SupportedFilter, SequencedSet<SearchValAndOp>> criteria, int page) {
+    public ParameterizedStatement buildSearchSql(SequencedSet<FilterOpVal> criteria, int page) {
         //"brand_name_version", "link", "price", "size"
         ParamStmtBuilder select = new ParamStmtBuilder()
                 .append("select")
@@ -107,27 +102,35 @@ public class FmakSqlBuilder {
      * @param criteria  the criteria
      * @return  a part of sql with the "where" clause
      */
-    ParamStmtBuilder whereFromCriteria(Map<SupportedFilter, SequencedSet<SearchValAndOp>> criteria){
+    ParamStmtBuilder whereFromCriteria(SequencedSet<FilterOpVal> criteria){
         ParamStmtBuilder result = new ParamStmtBuilder();
         result.append(" where");
 
         //first we build sql for the mandatory params ( category, country )
-        Set<SearchValAndOp> categoryValuesAndOps = criteria.get(SupportedFilter.category);
+        Set<SearchValAndOp> categoryValuesAndOps = criteria.stream()
+                .filter(filterOpVal -> filterOpVal.filter().equals(SupportedFilter.category))
+                .findFirst()
+                .map(FilterOpVal::values)
+                .orElseThrow(() -> new RuntimeException("category is mandatory"));
         result.append(" ").append(SupportedFilter.category.getColumn().prefixedColumnName());
         categoryValuesAndOps.forEach(categoryValAndOp ->
                 result.append(buildSqlOperatorFor(SupportedFilter.category.getColumn(), categoryValAndOp))
         );
 
-        Set<SearchValAndOp> countryValuesAndOps = criteria.get(SupportedFilter.country);
+        Set<SearchValAndOp> countryValuesAndOps = criteria.stream()
+                .filter(filterOpVal -> filterOpVal.filter().equals(SupportedFilter.country))
+                .findFirst()
+                .map(FilterOpVal::values)
+                .orElseThrow(() -> new RuntimeException("country is mandatory"));
         result.append(" and ").append(SupportedFilter.country.getColumn().prefixedColumnName());
         countryValuesAndOps.forEach(countryValAndOp ->
                 result.append(buildSqlOperatorFor(SupportedFilter.country.getColumn(), countryValAndOp))
         );
 
         //then we check the rest
-        for (Map.Entry<SupportedFilter, SequencedSet<SearchValAndOp>> currentCriteria : criteria.entrySet()) {
-            SupportedFilter currentKey = currentCriteria.getKey();
-            Set<SearchValAndOp> currentValuesAndOps = currentCriteria.getValue();
+        criteria.forEach(currentCriteria -> {
+            SupportedFilter currentKey = currentCriteria.filter();
+            Set<SearchValAndOp> currentValuesAndOps = currentCriteria.values();
             currentValuesAndOps.forEach(currentValAndOp -> {
                 //avoid the two filters already processed
                 if (!currentKey.equals(SupportedFilter.category) && !currentKey.equals(SupportedFilter.country)) {
@@ -137,7 +140,7 @@ public class FmakSqlBuilder {
                             .append(buildSqlOperatorFor(column, currentValAndOp));
                 }
             });
-        }
+        });
         return result;
     }
 
@@ -154,11 +157,11 @@ public class FmakSqlBuilder {
     String avoidForbiddenValues(FmakColumn column){
         return
                 switch(column){
-                    case ProductTableColumns.brand -> " and brand <> 'unknown'"; //no longer needed
-                    case ProductTableColumns.year -> " and year <> -1 and year <> -2"; //still needed
-                    case ProductTableColumns.version -> " and version <> 'not needed' and version <> 'unknown'"; //is this still needed ?
-                    case ProductAttributesTableColumns.size -> " and size <> 'unknown'"; //no longer needed
-                    case ProductTableColumns.product_name, ProductTableColumns.condition, ProductTableColumns.subprod_name, ProductAttributesTableColumns.price -> "";
+                    case ProductTable.brand -> " and brand <> 'unknown'"; //no longer needed
+                    case ProductTable.year -> " and year <> -1 and year <> -2"; //still needed
+                    case ProductTable.version -> " and version <> 'not needed' and version <> 'unknown'"; //is this still needed ?
+                    case ProductAttributesTable.size -> " and size <> 'unknown'"; //no longer needed
+                    case ProductTable.product_name, ProductTable.condition, ProductTable.subprod_name, ProductAttributesTable.price -> "";
                     default -> throw new RuntimeException("impossible to avoid forbidden values for column " + column);
                 };
     }

@@ -1,13 +1,13 @@
 package com.github.humbletrader.fmak.tables;
 
 import com.github.humbletrader.fmak.query.FmakColumn;
-import com.github.humbletrader.fmak.query.RenameMeTable;
+import com.github.humbletrader.fmak.query.FmakTable;
 import com.github.humbletrader.fmak.query.SqlType;
 
 import static com.github.humbletrader.fmak.query.SqlType.INT_TYPE;
 import static com.github.humbletrader.fmak.query.SqlType.VARCHAR_TYPE;
 
-public enum ProductTableColumns implements FmakColumn {
+public enum ProductTable implements FmakColumn {
 
     brand("brand", VARCHAR_TYPE),
     product_name("product_name", VARCHAR_TYPE),
@@ -21,7 +21,7 @@ public enum ProductTableColumns implements FmakColumn {
     private final String colName;
     private final SqlType sqlType;
 
-    ProductTableColumns(String colName, SqlType sqlType) {
+    ProductTable(String colName, SqlType sqlType) {
         this.colName = colName;
         this.sqlType = sqlType;
     }
@@ -37,7 +37,7 @@ public enum ProductTableColumns implements FmakColumn {
     }
 
     @Override
-    public RenameMeTable table() {
-        return RenameMeTable.PRODUCTS;
+    public FmakTable table() {
+        return FmakTable.PRODUCTS;
     }
 }
