@@ -5,6 +5,9 @@ import com.github.humbletrader.fmak.tables.ProductAttributesTable;
 import com.github.humbletrader.fmak.tables.ProductTable;
 import com.github.humbletrader.fmak.tables.ShopTable;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public enum SupportedFilter {
     country("country", ShopTable.country, 10_000),
 
@@ -19,15 +22,21 @@ public enum SupportedFilter {
     size("size", ProductAttributesTable.size, 500),
     price("price", ProductAttributesTable.price, 300);
 
+    //inspired by this: https://stackoverflow.com/questions/27703119/convert-from-string-to-a-java-enum-with-large-amount-of-values/27703839#27703839
+    private static class Holder {
+        static Map<String, SupportedFilter> STRING_TO_FILTER = new HashMap<>();
+    }
 
-    private String nameInWebsite;
-    private FmakColumn column;
-    private int priorityInSqlWhereClause;
+
+    private final String nameInWebsite;
+    private final FmakColumn column;
+    private final int priorityInSqlWhereClause;
 
     SupportedFilter(String nameInWebsite, FmakColumn column, int priorityInSqlWhereClause){
         this.nameInWebsite = nameInWebsite;
         this.column = column;
         this.priorityInSqlWhereClause = priorityInSqlWhereClause;
+        Holder.STRING_TO_FILTER.put(nameInWebsite, this);
     }
 
     public FmakColumn getColumn(){
@@ -38,13 +47,11 @@ public enum SupportedFilter {
         return priorityInSqlWhereClause;
     }
 
+    public String getNameInWebsite(){
+        return nameInWebsite;
+    }
+
     public static SupportedFilter filterFromName(String filterNameInWeb){
-        //todo: use a map instead of iterating
-        for(SupportedFilter filter : SupportedFilter.values()){
-            if(filter.nameInWebsite.equals(filterNameInWeb)){
-                return filter;
-            }
-        }
-        return null;
+        return Holder.STRING_TO_FILTER.get(filterNameInWeb);
     }
 }
