@@ -1,10 +1,10 @@
 package com.github.humbletrader.fmak.query;
 
+import org.junit.jupiter.api.Test;
+
 import java.util.*;
 
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class FmakSqlBuilderTest {
 
@@ -25,7 +25,7 @@ class FmakSqlBuilderTest {
                         "where p.category = ? "+
                         "and s.country = ? "+
                         "and p.product_name = ? "+
-                        "order by product_name",
+                        "order by p.product_name",
                 result.getSqlWithoutParameters()
         );
         assertEquals(Arrays.asList("KITES", "EU", "cabrinha"), result.getParamValues());
@@ -47,12 +47,12 @@ class FmakSqlBuilderTest {
                         "inner join product_attributes a on p.id = a.product_id " +
                         "where p.category = ? "+
                         "and s.country = ? " +
-                        "and a.size = ? "+
                         "and p.product_name = ? "+
-                        "order by product_name",
+                        "and a.size = ? "+
+                        "order by p.product_name",
                 result.getSqlWithoutParameters()
         );
-        assertEquals(List.of("KITES", "EU", "10", "cabrinha"), result.getParamValues());
+        assertEquals(List.of("KITES", "EU", "cabrinha", "10"), result.getParamValues());
     }
 
     @Test
@@ -69,7 +69,7 @@ class FmakSqlBuilderTest {
                         "where p.category = ? "+
                         "and s.country = ? " +
                         "and size <> 'unknown' "+
-                        "order by size",
+                        "order by a.size",
                 result.getSqlWithoutParameters()
         );
         assertEquals(List.of("KITES", "US"), result.getParamValues());
@@ -81,7 +81,7 @@ class FmakSqlBuilderTest {
         filters.put("category", new LinkedHashSet<>(List.of(new SearchValAndOp("KITES", "eq"))));
         filters.put("country", new LinkedHashSet<>(List.of(new SearchValAndOp("UK", "eq"))));
 
-        ParameterizedStatement result = underTest.buildSearchSql(filters, 2);
+        ParameterizedStatement result = underTest.buildSearchSqlForWebFilters(filters, 2);
         assertEquals("select p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public "+
                         "from products p " +
                         "inner join shops s on s.id = p.shop_id "+
@@ -102,20 +102,20 @@ class FmakSqlBuilderTest {
         filters.put("size", new LinkedHashSet<>(List.of(new SearchValAndOp("15.0", "gt"), new SearchValAndOp("17.0", "lt"))));
         filters.put("year", new LinkedHashSet<>(List.of(new SearchValAndOp("2022", "eq"))));
 
-        ParameterizedStatement result = underTest.buildSearchSql(filters, 1);
+        ParameterizedStatement result = underTest.buildSearchSqlForWebFilters(filters, 1);
         assertEquals("select p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public "+
                         "from products p " +
                         "inner join shops s on s.id = p.shop_id "+
                         "inner join product_attributes a on p.id = a.product_id " +
                         "where p.category = ? " +
                         "and s.country = ? "+
+                        "and p.year = ? "+
                         "and a.size > ? "+
                         "and a.size < ? "+
-                        "and p.year = ? "+
                         "order by a.price limit ? offset ?",
                 result.getSqlWithoutParameters()
         );
-        assertEquals(Arrays.asList("KITES", "USA", "15.0", "17.0", 2022, 21, 20), result.getParamValues());
+        assertEquals(Arrays.asList("KITES", "USA", 2022, "15.0", "17.0",  21, 20), result.getParamValues());
     }
 
     @Test
@@ -126,7 +126,7 @@ class FmakSqlBuilderTest {
         filters.put("size", new LinkedHashSet<>(List.of(new SearchValAndOp("17.0", "eq"))));
         filters.put("price", new LinkedHashSet<>(List.of(new SearchValAndOp("1000", "gt"))));
 
-        ParameterizedStatement result = underTest.buildSearchSql(filters, 1);
+        ParameterizedStatement result = underTest.buildSearchSqlForWebFilters(filters, 1);
         assertEquals("select p.brand_name_version, p.link, a.price, a.size, p.condition, p.visible_to_public "+
                         "from products p " +
                         "inner join shops s on s.id = p.shop_id "+

@@ -1,11 +1,15 @@
 package com.github.humbletrader.fmak.query;
 
+import com.github.humbletrader.fmak.criteria.FilterOpVal;
+import com.github.humbletrader.fmak.criteria.SupportedFilter;
+import com.github.humbletrader.fmak.tables.ProductAttributesTable;
+import com.github.humbletrader.fmak.tables.ProductTable;
+import com.google.common.collect.Streams;
+
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.SequencedSet;
-import java.util.Set;
-
-import static com.github.humbletrader.fmak.query.Tables.*;
-import static com.google.common.collect.Sets.intersection;
+import java.util.stream.Collectors;
 
 
 /**
@@ -23,30 +27,41 @@ public class FmakSqlBuilder {
         this.rowsPerPage = rowsPerPage;
     }
 
+    public ParameterizedStatement buildDistinctValuesSql(Map<String, SequencedSet<SearchValAndOp>> criteria,
+                                                         String column){
+        var filters = webFiltersToInternalFilters(criteria);
+        return buildDistinctValuesSql(filters, SupportedFilter.filterFromName(column));
+    }
+
     /**
      * builds the sql for 'distinct values call"
      * @param criteria the criteria for the search
-     * @param column    the column for which we check the distinct values
+     * @param distinctColumn    the column for which we check the distinct values
      * @return  the sql statement to be executed in order to get the distinct values from db
      */
-    public ParameterizedStatement buildDistinctValuesSql(Map<String, SequencedSet<SearchValAndOp>> criteria,
-                                                         String column){
+    public ParameterizedStatement buildDistinctValuesSql(SequencedSet<FilterOpVal> criteria,
+                                                         SupportedFilter distinctColumn){
         ParamStmtBuilder selectStatement = new ParamStmtBuilder()
                 .append("select distinct")
-                .append(prefixedColumn(column))
+                .append(" ").append(distinctColumn.getColumn().prefixedColumnName())
                 .append(" from products p")
                 .append(" inner join shops s on s.id = p.shop_id");
 
-        if(PRODUCT_ATTRIBUTES.hasColumn(column) ||
-                !intersection(criteria.keySet(), PRODUCT_ATTRIBUTES.getColumnNames()).isEmpty()){
+        if(FmakTable.PRODUCT_ATTRIBUTES == distinctColumn.getColumn().table() ||
+                criteria.stream().anyMatch(filterOperatorValues -> filterOperatorValues.filter().getColumn().table().equals(FmakTable.PRODUCT_ATTRIBUTES))){
             selectStatement.append(" inner join product_attributes a on p.id = a.product_id");
         }
 
         selectStatement
                 .append(whereFromCriteria(criteria))
-                .append(avoidForbiddenValues(column))
-                .append(" order by ").append(column);
+                .append(avoidForbiddenValues(distinctColumn.getColumn()))
+                .append(" order by ").append(distinctColumn.getColumn().prefixedColumnName());
         return selectStatement.build();
+    }
+
+    public ParameterizedStatement buildSearchSqlForWebFilters(Map<String, SequencedSet<SearchValAndOp>> criteria, int page) {
+        var filters = webFiltersToInternalFilters(criteria);
+        return buildSearchSql(filters, page);
     }
 
 
@@ -56,7 +71,7 @@ public class FmakSqlBuilder {
      * @param page  the new page requested
      * @return  the sql to be executed against the db
      */
-    public ParameterizedStatement buildSearchSql(Map<String, SequencedSet<SearchValAndOp>> criteria, int page) {
+    public ParameterizedStatement buildSearchSql(SequencedSet<FilterOpVal> criteria, int page) {
         //"brand_name_version", "link", "price", "size"
         ParamStmtBuilder select = new ParamStmtBuilder()
                 .append("select")
@@ -75,40 +90,38 @@ public class FmakSqlBuilder {
      * @param criteria  the criteria
      * @return  a part of sql with the "where" clause
      */
-    ParamStmtBuilder whereFromCriteria(Map<String, SequencedSet<SearchValAndOp>> criteria){
+    private ParamStmtBuilder whereFromCriteria(SequencedSet<FilterOpVal> criteria){
         ParamStmtBuilder result = new ParamStmtBuilder();
         result.append(" where");
 
-        //first we build sql for the mandatory params ( category, country )
-        Set<SearchValAndOp> categoryValuesAndOps = criteria.get("category");
-        result.append(" p.category");
-        categoryValuesAndOps.forEach(categoryValAndOp ->
-                result.append(buildSqlOperatorFor(findColumn("category"), categoryValAndOp))
-        );
+        Streams.mapWithIndex(
+                criteria.stream(),
+                (crit, idx) -> buildWhereCondition(crit, idx == 0 ? " " : " and ")
+        )
+        .forEachOrdered(result::append);
 
-        Set<SearchValAndOp> countryValuesAndOps = criteria.get("country");
-        result.append(" and s.country");
-        countryValuesAndOps.forEach(countryValAndOp ->
-                result.append(buildSqlOperatorFor(findColumn("country"), countryValAndOp))
-        );
-
-        //then we check the rest
-        for (Map.Entry<String, SequencedSet<SearchValAndOp>> currentCriteria : criteria.entrySet()) {
-            String currentKey = currentCriteria.getKey();
-            Set<SearchValAndOp> currentValuesAndOps = currentCriteria.getValue();
-            currentValuesAndOps.forEach(currentValAndOp -> {
-                if (!currentKey.equals("category") && !currentKey.equals("country")) {
-                    Column column = findColumn(currentKey);
-                    result.append(" and").append(prefixedColumn(currentKey))
-                            .append(buildSqlOperatorFor(column, currentValAndOp));
-                }
-            });
-        }
         return result;
     }
 
-    private ParamStmtBuilder buildSqlOperatorFor(Column column, SearchValAndOp searchValAndOp){
+    private ParamStmtBuilder buildWhereCondition(FilterOpVal filterOpVal,
+                                                 String before){
         ParamStmtBuilder result = new ParamStmtBuilder();
+        result.append(before);
+
+        FmakColumn column = filterOpVal.filter().getColumn();
+
+        Streams.mapWithIndex(
+                    filterOpVal.values().stream(),
+                    (searchValAndOp, idx) -> buildWhereSingleCondition(column, searchValAndOp, idx == 0 ? "" : " and ")
+                )
+                .forEachOrdered(result::append);
+        return result;
+    }
+
+    private ParamStmtBuilder buildWhereSingleCondition(FmakColumn column, SearchValAndOp searchValAndOp, String before){
+        ParamStmtBuilder result = new ParamStmtBuilder();
+        result.append(before);
+        result.append(column.prefixedColumnName());
         var sqlOp = SqlOperators.forJs(searchValAndOp.op());
         return switch(sqlOp){
             case ANY -> result.append(" in ( ? )", searchValAndOp.value(), column.sqlType());
@@ -116,48 +129,29 @@ public class FmakSqlBuilder {
         };
     }
 
-    private String prefixedColumn(String column){
-        if (PRODUCT_ATTRIBUTES.hasColumn(column)) {
-            return " "+PRODUCT_ATTRIBUTES.getSqlPrefix()+"."+column;
-        }else{
-            return " "+PRODUCTS.getSqlPrefix()+"." +column;
-        }
-    }
-
     @Deprecated //todo: as the parser gets better we don't need this method anymore
-    String avoidForbiddenValues(String column){
+    private String avoidForbiddenValues(FmakColumn column){
         return
                 switch(column){
-                    case "brand" -> " and brand <> 'unknown'"; //no longer needed
-                    case "year" -> " and year <> -1 and year <> -2"; //still needed
-                    case "version" -> " and version <> 'not needed' and version <> 'unknown'"; //is this still needed ?
-                    case "size" -> " and size <> 'unknown'"; //no longer needed
-                    case "product_name", "condition", "subprod_name", "price" -> "";
+                    case ProductTable.brand -> " and brand <> 'unknown'"; //no longer needed
+                    case ProductTable.year -> " and year <> -1 and year <> -2"; //still needed
+                    case ProductTable.version -> " and version <> 'not needed' and version <> 'unknown'"; //is this still needed ?
+                    case ProductAttributesTable.size -> " and size <> 'unknown'"; //no longer needed
+                    case ProductTable.product_name, ProductTable.condition, ProductTable.subprod_name, ProductAttributesTable.price -> "";
                     default -> throw new RuntimeException("impossible to avoid forbidden values for column " + column);
                 };
     }
 
-    private Tables findTable(String columnName){
-        Tables table = null;
-        if(PRODUCT_ATTRIBUTES.hasColumn(columnName)){
-            table = PRODUCT_ATTRIBUTES;
-        }else{
-            if(SHOPS.hasColumn(columnName)){
-                table = SHOPS;
-            } else {
-                table = PRODUCTS;
-            }
-        }
-        return table;
+    private SequencedSet<FilterOpVal> webFiltersToInternalFilters(Map<String, SequencedSet<SearchValAndOp>> webFilters){
+        return webFilters.entrySet()
+                .stream()
+                .map(entry ->
+                        new FilterOpVal(
+                                SupportedFilter.filterFromName(entry.getKey()),
+                                entry.getValue()
+                        )
+                )
+                .sorted((fov1, fov2) -> Integer.compare(fov2.filter().getPriorityInSqlWhereClause(), fov1.filter().getPriorityInSqlWhereClause()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
-
-    private Column findColumn(String columnName){
-        //todo: in order to find it faster another structure should be used
-        //this is just a temporary solution
-        Tables table = findTable(columnName);
-        Column result = table.getColumn(columnName);
-        return result;
-    }
-
-
 }
