@@ -2,7 +2,6 @@ package com.github.humbletrader.fmak.query;
 
 import com.github.humbletrader.fmak.criteria.FilterOpVal;
 import com.github.humbletrader.fmak.criteria.SupportedFilter;
-import com.github.humbletrader.fmak.tables.ProductAttributesTable;
 import com.github.humbletrader.fmak.tables.ProductTable;
 import com.google.common.collect.Streams;
 
@@ -15,17 +14,7 @@ import java.util.stream.Collectors;
 /**
  *  CONVENTION: the resulting sql is lower case
  */
-public class FmakSqlBuilder {
-
-    public final int rowsPerPage;
-
-    /**
-     * creates a new instance of the sql builder
-     * @param rowsPerPage rows per page configuration
-     */
-    public FmakSqlBuilder(int rowsPerPage){
-        this.rowsPerPage = rowsPerPage;
-    }
+public record FmakSqlBuilder(int rowsPerPage){
 
     public ParameterizedStatement buildDistinctValuesSql(Map<String, SequencedSet<SearchValAndOp>> criteria,
                                                          String column){
@@ -131,15 +120,11 @@ public class FmakSqlBuilder {
 
     @Deprecated //todo: as the parser gets better we don't need this method anymore
     private String avoidForbiddenValues(FmakColumn column){
-        return
-                switch(column){
-                    case ProductTable.brand -> " and brand <> 'unknown'"; //no longer needed
-                    case ProductTable.year -> " and year <> -1 and year <> -2"; //still needed
-                    case ProductTable.version -> " and version <> 'not needed' and version <> 'unknown'"; //is this still needed ?
-                    case ProductAttributesTable.size -> " and size <> 'unknown'"; //no longer needed
-                    case ProductTable.product_name, ProductTable.condition, ProductTable.subprod_name, ProductAttributesTable.price -> "";
-                    default -> throw new RuntimeException("impossible to avoid forbidden values for column " + column);
-                };
+        return switch(column){
+            case ProductTable.year -> " and year <> -1 and year <> -2"; //still needed
+            case ProductTable.version -> " and version <> 'not needed' and version <> 'unknown'"; //is this still needed ?
+            default -> "";
+        };
     }
 
     private SequencedSet<FilterOpVal> webFiltersToInternalFilters(Map<String, SequencedSet<SearchValAndOp>> webFilters){

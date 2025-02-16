@@ -68,8 +68,25 @@ class FmakSqlBuilderTest {
                         "inner join product_attributes a on p.id = a.product_id " +
                         "where p.category = ? "+
                         "and s.country = ? " +
-                        "and size <> 'unknown' "+
                         "order by a.size",
+                result.getSqlWithoutParameters()
+        );
+        assertEquals(List.of("KITES", "US"), result.getParamValues());
+    }
+
+    @Test
+    public void distinctConstructionTech(){
+        Map<String, SequencedSet<SearchValAndOp>> filters = new HashMap<>();
+        filters.put("category", new LinkedHashSet<>(List.of(new SearchValAndOp("KITES", "eq"))));
+        filters.put("country", new LinkedHashSet<>(List.of(new SearchValAndOp("US", "eq"))));
+
+        ParameterizedStatement result = underTest.buildDistinctValuesSql(filters, "construction_tech");
+        assertEquals(
+                "select distinct p.construction_tech from products p " +
+                        "inner join shops s on s.id = p.shop_id " +
+                        "where p.category = ? "+
+                        "and s.country = ? " +
+                        "order by p.construction_tech",
                 result.getSqlWithoutParameters()
         );
         assertEquals(List.of("KITES", "US"), result.getParamValues());

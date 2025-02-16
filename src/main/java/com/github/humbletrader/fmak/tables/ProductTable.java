@@ -16,7 +16,8 @@ public enum ProductTable implements FmakColumn {
     link("link", VARCHAR_TYPE),
     category("category", VARCHAR_TYPE),
     condition("condition", VARCHAR_TYPE),
-    subprod_name("subprod_name", VARCHAR_TYPE);
+    subprod_name("subprod_name", VARCHAR_TYPE),
+    construction_tech("construction_tech", VARCHAR_TYPE);
 
     private final String colName;
     private final SqlType sqlType;

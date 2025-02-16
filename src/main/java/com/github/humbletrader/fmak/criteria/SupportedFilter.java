@@ -20,7 +20,8 @@ public enum SupportedFilter {
     year("year", ProductTable.year, 2_000),
 
     size("size", ProductAttributesTable.size, 500),
-    price("price", ProductAttributesTable.price, 300);
+    price("price", ProductAttributesTable.price, 300),
+    tech("construction_tech", ProductTable.construction_tech, 300);
 
     //inspired by this: https://stackoverflow.com/questions/27703119/convert-from-string-to-a-java-enum-with-large-amount-of-values/27703839#27703839
     private static class Holder {
